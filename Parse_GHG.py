@@ -36,7 +36,8 @@ class read_GHG():
             Status = pd.read_csv(zip_ref.open(name+'-li7700.status'),delimiter='\t',skiprows=7)
             Status_Summary = self.Summarize_Data(Status,self.status_Means)
             co2app = Read_co2Cal(zip_ref.open('system_config/co2app.conf').read().decode("utf-8"))
-        
+            self.co2app_Tags = co2app.columns
+
         self.Summary = pd.concat(
             [self.MetaData,Data_Summary,Status_Summary,co2app.Summary],
             axis=0,
@@ -54,6 +55,7 @@ class read_GHG():
                                 axis=0,
                                 ignore_index=True
                             )
+        self.MetaData_Tags = self.MetaData['Attribute'].values
 
 
     def Summarize_Data(self,Data,means,diagnostics=None):
