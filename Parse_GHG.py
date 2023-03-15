@@ -2,6 +2,7 @@ import zipfile
 from datetime import datetime
 import configparser
 import pandas as pd
+import numpy as np
 from io import TextIOWrapper
 from Read_co2app import read_file as Read_co2Cal
 
@@ -14,11 +15,25 @@ class read_GHG():
         
         # Important values in the data file
         self.data_Means = ['CO2 Absorptance', 'H2O Absorptance','CO2 (mmol/m^3)', 'H2O (mmol/m^3)',
-        'Block Temperature (C)', 'Total Pressure (kPa)','Box Pressure (kPa)', 'Head Pressure (kPa)', 'Aux 1 - U (m/s)',
-        'Aux 2 - V (m/s)', 'Aux 3 - W (m/s)', 'Aux 4 - SOS (m/s)','Cooler Voltage (V)', 'Chopper Cooler Voltage (V)',
-        'Dew Point (C)','Cell Temperature (C)', 'Temperature In (C)','Temperature Out (C)', 'Average Signal Strength',
+        'Block Temperature (C)', 'Total Pressure (kPa)','Box Pressure (kPa)', 'Head Pressure (kPa)', 
+        'Aux 1 - U (m/s)','Aux 2 - V (m/s)', 'Aux 3 - W (m/s)', 'Aux 4 - SOS (m/s)',
+        'Cooler Voltage (V)', 'Chopper Cooler Voltage (V)','Dew Point (C)','Cell Temperature (C)', 
+        'Temperature In (C)','Temperature Out (C)', 'Average Signal Strength',
         'Flow Rate (lpm)','Flow Pressure (kPa)', 'Flow Power (V)', 'Flow Drive (%)',
         'CH4 (umol/mol)','CH4 Temperature', 'CH4 Pressure','CH4 Signal Strength']
+
+        # EP needs the column numbers for these specified
+        self.EP_Data_Channels =  ['CO2 dry(umol/mol)','H2O dry(mmol/mol)','CH4 (mmol/m^3)',
+                'N2O (mmol/m^3)',# Not needed - but worth noting,
+                'Temperature In (C)','Temperature Out (C)','Total Pressure (kPa)',
+                'CH4 Temperature','CH4 Pressure','Cell Temperature (C)',
+                # 7200/7700 diagnostics 
+                'Diagnostic Value','CH4 Diagnostic Value',
+                # don't have CSAT diagnostics in our BB1 or BB2 DATA files,
+                'Anemometer Diagnostics',              
+                # Not yet needed now, but may need value will be for historical or future use
+                'Diagnostic Value 2', 
+                ]
 
         # Diagnostic values in the data file
         # Require a bit of work for interpretation
@@ -34,6 +49,7 @@ class read_GHG():
             self.Parse_Metadata()
             Data = pd.read_csv(zip_ref.open(name+'.data'),delimiter='\t',skiprows=7)
             Data_Summary = self.Summarize_Data(Data,self.data_Means,self.data_Diagnostics)
+            self.Get_Channels(Data)
             Status = pd.read_csv(zip_ref.open(name+'-li7700.status'),delimiter='\t',skiprows=7)
             Status_Summary = self.Summarize_Data(Status,self.status_Means)
             co2app = Read_co2Cal(zip_ref.open('system_config/co2app.conf').read().decode("utf-8"))
@@ -46,6 +62,8 @@ class read_GHG():
         # # Get the file timestamp
         TimeStamp = datetime.strptime(name.split('_')[0],'%Y-%m-%dT%H%M%S')
         self.Summary['TimeStamp'] = TimeStamp
+        # self.Channels['TimeStamp'] = TimeStamp
+        self.Channels['filename'] = name+'.ghg'
         self.Summary['filename'] = name+'.ghg'
         # return(config,Summary)
 
@@ -62,7 +80,6 @@ class read_GHG():
 
 
     def Summarize_Data(self,Data,means,diagnostics=None):
-
         Data_Summary = Data[means].mean().to_frame().reset_index()
         Data_Summary.columns=['Attribute','Value']
         if diagnostics is not None:
@@ -81,3 +98,20 @@ class read_GHG():
                                 ignore_index=True                            
                                 )
         return (Data_Summary)
+    
+    def Get_Channels(self,Data):
+        Col_Pos = {}
+        for v in self.EP_Data_Channels:
+            Col_Pos[v] = []
+        for v in self.EP_Data_Channels:
+            col_num = np.where(Data.columns==v)[0]
+            if len(col_num) != 1:
+                if len(col_num)>1:
+                    print('Warning!  Duplicate Column Headers')
+                    col_num = col_num[0]
+                else:
+                    col_num=0
+            else:
+                col_num = col_num[0]
+            Col_Pos[v].append(col_num)
+        self.Channels = pd.DataFrame(data=Col_Pos)
