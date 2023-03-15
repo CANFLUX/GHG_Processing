@@ -9,7 +9,8 @@ class read_GHG():
 
     def __init__(self,root,name):
         # Sections in the ghg file
-        self.metadata_Tags = ['Site','Station','Timing','Instruments','FileDescription']
+        # I think we can ignore the "file description"
+        self.metadata_Tags = ['Site','Station','Timing','Instruments']#,'FileDescription'
         
         # Important values in the data file
         self.data_Means = ['CO2 Absorptance', 'H2O Absorptance','CO2 (mmol/m^3)', 'H2O (mmol/m^3)',
@@ -36,7 +37,7 @@ class read_GHG():
             Status = pd.read_csv(zip_ref.open(name+'-li7700.status'),delimiter='\t',skiprows=7)
             Status_Summary = self.Summarize_Data(Status,self.status_Means)
             co2app = Read_co2Cal(zip_ref.open('system_config/co2app.conf').read().decode("utf-8"))
-            self.co2app_Tags = co2app.columns
+            self.co2app_Tags = co2app.Summary.columns
 
         self.Summary = pd.concat(
             [self.MetaData,Data_Summary,Status_Summary,co2app.Summary],
@@ -44,11 +45,13 @@ class read_GHG():
             ignore_index=True).set_index('Attribute').T
         # # Get the file timestamp
         TimeStamp = datetime.strptime(name.split('_')[0],'%Y-%m-%dT%H%M%S')
-        self.Summary['TimeStamp'] = [TimeStamp]
+        self.Summary['TimeStamp'] = TimeStamp
+        self.Summary['filename'] = name+'.ghg'
         # return(config,Summary)
 
     
     def Parse_Metadata(self):
+       
         self.MetaData = pd.concat(
             [pd.DataFrame(data={'Attribute':self.config[key].keys(),
                                 'Value':self.config[key].values()}) for key in self.metadata_Tags],
@@ -69,6 +72,8 @@ class read_GHG():
             # Need to sort out more appropriate approach
             # Storing as an array of unique values may be better?
             data_Diagnostics = Data[diagnostics].mode().T.reset_index()
+            if len(data_Diagnostics.columns)>2:
+                print(data_Diagnostics)
             data_Diagnostics.columns=['Attribute','Value']
             Data_Summary = pd.concat(
                                 [Data_Summary,data_Diagnostics,Count],
