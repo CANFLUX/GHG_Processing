@@ -62,7 +62,7 @@ class read_GHG():
         # # Get the file timestamp
         TimeStamp = datetime.strptime(name.split('_')[0],'%Y-%m-%dT%H%M%S')
         self.Summary['TimeStamp'] = TimeStamp
-        # self.Channels['TimeStamp'] = TimeStamp
+        self.Channels['TimeStamp'] = TimeStamp
         self.Channels['filename'] = name+'.ghg'
         self.Summary['filename'] = name+'.ghg'
         # return(config,Summary)
