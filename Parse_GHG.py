@@ -69,7 +69,6 @@ class read_GHG():
 
     
     def Parse_Metadata(self):
-       
         self.MetaData = pd.concat(
             [pd.DataFrame(data={'Attribute':self.config[key].keys(),
                                 'Value':self.config[key].values()}) for key in self.metadata_Tags],
