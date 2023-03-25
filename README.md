@@ -60,4 +60,4 @@ More info [here](https://www.licor.com/env/support/LI-7700/topics/data-files.htm
 
 ## co2app.conf
 
-Haven't been able to find any useful metadata about this file, but it contains the timing of the current calibration and coefficient values
+Haven't been able to find any useful metadata about this file.  Its is not in an easy to read format, so I've added "formatted" examples under example files.  It contains matadata for the 7200/7500 calibrations including the timing of the current calibration and coefficient values.  It also includes a lot of data that is repeated in the metadata files.  Its not the full configuration file for the 7550 - but it includes a lot of the info.

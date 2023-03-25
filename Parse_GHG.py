@@ -8,10 +8,10 @@ from Read_co2app import read_file as Read_co2Cal
 
 class read_GHG():
 
-    def __init__(self,root,name):
-        # Sections in the ghg file
-        # I think we can ignore the "file description"
-        self.metadata_Tags = ['Site','Station','Timing','Instruments']#,'FileDescription'
+    def __init__(self,root,name,ini):
+        self.metadata_Tags = ini['METADATA']['Sections'].split(',')
+        for key in self.metadata_Tags:
+            print(key)
         
         # Important values in the data file
         self.data_Means = ['CO2 Absorptance', 'H2O Absorptance','CO2 (mmol/m^3)', 'H2O (mmol/m^3)',
