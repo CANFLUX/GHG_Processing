@@ -55,15 +55,25 @@ class read_GHG():
 
     def Read(self,reset=False):
         self.files = pd.read_csv(self.meta_dir+'All_Complete_GHG_Files.csv',parse_dates=['timestamp'])
+
+        # Sort so that newest files get processed first
+        self.files = self.files.sort_index(ascending=False)
+
+        # Values that don't change - ie. elevation, site name, lat/lon
+        self.staticMetatdata = configparser.ConfigParser()
         
-        if reset is False:
+        if reset is False and os.path.isfile(self.meta_dir+'dynamicMetadata.csv'):
             self.dynamicMetadata = pd.read_csv(self.meta_dir+'dynamicMetadata.csv')
             self.Channels = pd.read_csv(self.meta_dir+'Channels.csv')
+            self.staticMetatdata.read_file(open(self.meta_dir+'staticMetadata.conf'))
         else:
             self.dynamicMetadata = pd.DataFrame()
             self.Channels = pd.DataFrame()
+            self.staticMetatdata.read_string('')
+            self.staticMetatdata['Site'] = {}
+            self.staticMetatdata['Station'] = {}
 
-            
+        # print()
         # df = df.set_index('datetime')
         # return (df)
         # self.FileNames = {
