@@ -1,14 +1,17 @@
-import zipfile
-from datetime import datetime
+import os
+# import zipfile
+# from datetime import datetime
 import configparser
 import pandas as pd
 import numpy as np
-from io import TextIOWrapper
-from Read_co2app import read_file as Read_co2Cal
+# from io import TextIOWrapper
+# from Read_co2app import read_file as Read_co2Cal
 
 class read_GHG():
 
-    def __init__(self,root,name,ini):
+    def __init__(self,ini_file):
+        ini = configparser.ConfigParser()
+        ini.read_file(open(ini_file))
         self.metadata_Tags = ini['METADATA']['Sections'].split(',')
         self.data_Means = ini['DATA']['Means'].split(',')
         self.EP_Data_Channels =  ini['DATA']['Channels'].split(',')
@@ -16,8 +19,71 @@ class read_GHG():
         self.status_Means = ini['STATUS']['Means'].split(',')
         self.Calibration = ini['CO2app']['Calibrate'].split(',')
         self.Coefficients = ini['CO2app']['Coef'].split(',')
+        self.dpath = ini['highfreq']['path']
 
-        self.config = configparser.ConfigParser()
+    def find_ghg (self,Site):
+        self.raw_dir = self.dpath+Site+'\\raw\\'
+        self.meta_dir = self.dpath+Site+'\\metadata\\'
+        if not os.path.exists(self.meta_dir):
+            os.mkdir(meta_dir)
+
+        # Find every .ghg file in the raw data folder
+        all_files = []
+        for (root, dir, files) in os.walk(self.raw_dir):
+            if root != self.raw_dir:
+                for file in files:
+                    name, tag = file.split('.')
+                    # .ghg files are located at the end of each directory tree
+                    # Avoids reading any that might be misplaced elsewhere
+                    if tag == 'ghg' and len(dir)==0:
+                        # Use the filename as the index
+                        all_files.append(name)
+
+        df = pd.DataFrame(data={
+                'filename':all_files,
+                })
+        # Get the timestamp from the filename
+        df['timestamp'] = pd.to_datetime(df['filename'].str.split('_').str[0])
+        df = df.set_index('timestamp')
+
+        # Exclude any files that fall off half hourly intervals ie. maintenance
+        df.loc[((df.index.minute!=30)&(df.index.minute!=0)),'filename'] = np.nan
+        # Resample to 30 min intervals - missing filenames will be null
+        df = df.resample('30T').first()
+        # Save the list of files
+        df.to_csv(self.meta_dir+'All_Complete_GHG_Files.csv')
+
+    def Read(self,reset=False):
+        self.files = pd.read_csv(self.meta_dir+'All_Complete_GHG_Files.csv',parse_dates=['timestamp'])
+        
+        if reset is False:
+            self.dynamicMetadata = pd.read_csv(self.meta_dir+'dynamicMetadata.csv')
+            self.Channels = pd.read_csv(self.meta_dir+'Channels.csv')
+        else:
+            self.dynamicMetadata = pd.DataFrame()
+            self.Channels = pd.DataFrame()
+
+            
+        # df = df.set_index('datetime')
+        # return (df)
+        # self.FileNames = {
+        #     'Metadata':self.meta_dir+'GHGMetaData.csv',
+        #     'Channels':self.meta_dir+'EP_Channels.csv',
+        #     'Calibration':self.meta_dir+'Calibrate.csv',
+        #     'Coefficients':self.meta_dir+'Coefficients.csv',
+        # }
+        
+        # if os.path.isfile(meta_file) and make_new is False:
+        #     self.Records = pd.read_csv(self.FileNames['Metadata'],parse_dates=['TimeStamp'])
+        #     # Channels = pd.read_csv(channel_file)
+        #     # FileNames = Records['filename'].tolist()
+        # else:
+        #     self.Records = pd.DataFrame()
+            # Channels = pd.DataFrame()
+            # FileNames = []
+
+
+        # self.config = configparser.ConfigParser()
         # Reading the zipped data without extracting saves a bit of time
     #     with zipfile.ZipFile(root+'\\'+name+'.ghg', 'r') as zip_ref:
     #         self.config.read_file(TextIOWrapper(zip_ref.open(name+'.metadata'), 'utf-8'))
