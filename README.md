@@ -61,3 +61,80 @@ More info [here](https://www.licor.com/env/support/LI-7700/topics/data-files.htm
 ## co2app.conf
 
 Haven't been able to find any useful metadata about this file.  Its is not in an easy to read format, so I've added "formatted" examples under example files.  It contains matadata for the 7200/7500 calibrations including the timing of the current calibration and coefficient values.  It also includes a lot of data that is repeated in the metadata files.  Its not the full configuration file for the 7550 - but it includes a lot of the info.
+
+The sections we are interested in are: **Calibrate** and **Coef**.  
+Below are examples of sections we are interested in in .config file format
+
+### Calibrate
+
+[ZeroCO2]
+Val=1.17643
+Date=Jul 28 2022 at 10:29:32
+[SpanCO2]
+Val=1.02727
+Target=404.2
+Tdensity=16.1496
+Date=Jul 28 2022 at 10:36:30
+[Span2CO2]
+Val=0.0000
+Target=
+Tdensity=
+ic=0.117661
+act=0.114538
+Date=4Cal
+[ZeroH2O]
+Val=0.986739
+Date=Jul 28 2022 at 10:29:42
+[SpanH2O]
+Val=1.02615
+Target=12
+Tdensity=569.034
+Date=Feb 7 2020 at 15:00:18
+[Span2H2O]
+Val=0.0000
+Target=
+Tdensity=
+iw=0.0626465
+awt=0.0609231
+Date=4Cal
+[MaxRef]
+CX=38736.8
+WX=49803.5
+Date=Mar 18 2022 at 15:31:48
+
+### Coef
+
+[Current]
+SerialNo=72H-0816
+[Band]
+A=1.15
+[CO2]
+A=1.05790E+2
+B=1.85532E+4
+C=8.28945E+6
+D=-1.15799E+9
+E=1.00378E+11
+XS=0.0028
+Z=3.84E-05
+SD1=3.230E-2
+SD2=-6.330E-2
+SD3=2.085E+0
+[H2O]
+A=5.59192E+3
+B=5.95452E+6
+C=-5.74709E+8
+XS=-0.0012
+Z=-1.96E-04
+SD1=1.910E-2
+SD2=1.323E+0
+SD3=2.385E+0
+[Pressure]
+A0=57.704
+A1=15.424
+[DPressure]
+A0=0.000
+A1=1.000
+SerialNo=72H-0816
+[MaxRef]
+B=0.050
+C=0.051
