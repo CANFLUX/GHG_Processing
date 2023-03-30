@@ -191,19 +191,12 @@ class read_LI_Config():
             self.ini=ini['CO2APP']
 
 
-    def parse(self,co2app_file):
-        
-        Calibration = co2app_file.split('Calibrate')[-1].split('Coef')[0]
-        Coefs = co2app_file.split('Coef')[-1].split('Clock')[0][:-1]
-        Sonic = co2app_file.split('Inputs')[-1].split('Calibrate')[0]
-
-        self.makeConfig(Sonic)
-        print(self.config.keys())
-        # for key in self.config.keys():
-        #     print(key)
-
-
-
+    def parse(self,file):
+        self.parsedConfig = {}
+        for key in self.ini.keys():
+            splits = self.ini[key].split(',')
+            self.makeConfig(file.split(splits[0])[-1].split(splits[1])[0])
+            self.parsedConfig[key]=self.config
 
     def makeConfig(self,string,pnt=False):
         all = re.findall(r'\((.+?)\)',string)
