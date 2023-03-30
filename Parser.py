@@ -1,12 +1,12 @@
 import os
 import zipfile
-import linecache
+import re
 import configparser
 import numpy as np
 import pandas as pd
 from datetime import datetime
 from io import TextIOWrapper
-from Read_co2app import read_file as Read_co2Cal
+# from Read_co2app import read_file as Read_co2Cal
 
 class read_GHG():
 
@@ -136,8 +136,9 @@ class read_GHG():
                             skiprows=self.header_rows-1)
                         self.dataRecords.loc[self.TimeStamp,self.status_Means] = Status[self.status_Means].mean()
                     elif name.split('.')[-1] == 'conf':
-                        co2app = Read_co2Cal(zip_ref.open(name).read().decode("utf-8"))
-                        self.co2app_Tags = co2app.Summary.columns
+                        # co2app = Read_co2Cal(zip_ref.open(name).read().decode("utf-8"))
+                        self.co2app = read_LI_Config(zip_ref.open(name).read().decode("utf-8"))
+                        # self.co2app_Tags = co2app.Summary.columns
                 self.Parse_Headerdata()
             else:
                 print('Warning - invalid metadata - skipping file')
@@ -161,14 +162,6 @@ class read_GHG():
                         self.Headers.loc[self.TimeStamp,key+'_'+model] = self.Headerdata[tag][key]
                     else:
                         self.Headers.loc[self.TimeStamp,key] = self.Headerdata[tag][key]
-    #         for key in self.ini[tag].keys():
-    #             if self.ini[tag][key] == 'True':
-    #                 self.dynamicMetadata.loc[self.TimeStamp,key]=self.Metadata[tag][key]
-    #     self.header_rows = int(self.Metadata['FileDescription']['header_rows'])
-    
-    # def Get_Header(self,file):
-    #     print(linecache.getline(file, 4))
-        # self.header_rows-1
 
     def Get_Channels(self,cols):
         # Col_Pos = {}
@@ -183,3 +176,54 @@ class read_GHG():
                 channel = int(col_num[0])
             self.Channels.loc[self.TimeStamp,v] = channel
 
+
+class read_LI_Config():
+    # Parse the system_config\co2app.conf file from the 7200 to get calibration settings
+    # Only an option for co2/h2o the ch4 calibration values are only saved on the LI-7000
+    def __init__(self,co2app_file):
+        self.Coef = re.search(r'Coef(.*?)\)\)\)', co2app_file).group(0)
+        Coef_Keys =  ['CO2 ','H2O ','Pressure ','MaxRef']
+        Coef_Summary = pd.concat(
+            [self.Parse_Coef(Val) for Val in Coef_Keys],
+            axis=0,
+            ignore_index=True)
+
+        self.Calibrate = re.search(r'Calibrate(.*?)\)\)\)', co2app_file).group(0)
+        Calibrate_Keys =  ['ZeroCO2','SpanCO2','ZeroH2O','SpanH2O'] # Span2CO2 & Span2H2O not needed
+        Calibrate_Summary = pd.concat(
+            [self.Parse_Cal(Val) for Val in Calibrate_Keys],
+            axis=0,
+            ignore_index=True)
+
+        self.Summary = pd.concat(
+            [Calibrate_Summary,Coef_Summary],
+            axis=0)
+    
+    def Parse_Coef(self,key):
+        # Get Calibration coefficients from co2app file
+        Coef_Info = re.search(r''+key+'\((.*?)\)\)', self.Coef).group(1).replace(')(',' ')
+        Coef_Info = pd.DataFrame(np.array([v for v in Coef_Info.split(' ')]).reshape(-1,2))
+        Coef_Info = Coef_Info.rename(columns={0:'Attribute',1:'Value'})
+        Coef_Info['Attribute']=key.replace(' ','')+'_'+Coef_Info['Attribute'].astype(str)
+        return(Coef_Info)
+        
+    def Parse_Cal(self,key):
+        # Get Calibration metadata from co2app file
+        Cal_Info = re.search(r''+key+'(.*?)\)\)', self.Calibrate).group(1)
+        Cal_Date = Cal_Info.split('(Date ')[-1].replace(' at ',' ')
+        Cal_Stats = Cal_Info.split('(Date ')[0]
+        Cal_Stats = re.search(r'\((.*)\)', Cal_Stats).group(1).replace(')(',' ')
+        Cal_Stats = pd.DataFrame(np.array([v for v in Cal_Stats.split(' ')]).reshape(-1,2))
+        Cal_Stats = Cal_Stats.rename(columns={0:'Attribute',1:'Value'})
+        Cal_Stats['Attribute']=key+'_'+Cal_Stats['Attribute'].astype(str)
+        try:
+            timestamp = datetime.strptime(Cal_Date,'%b %d %Y %H:%M:%S')
+        except:
+            timestamp = pd.Timestamp('nat')
+            pass
+        Cal_Stats = pd.concat(
+            [Cal_Stats,pd.DataFrame(data={'Attribute':[key+'_Timestamp'],'Value':[timestamp]},index=[0])],
+            axis=0,
+            ignore_index=True
+        )
+        return(Cal_Stats)
