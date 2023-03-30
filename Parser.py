@@ -19,8 +19,8 @@ class read_GHG():
         self.EP_Data_Channels =  self.ini['DATA']['Channels'].split(',')
         self.data_Diagnostics = self.ini['DATA']['Diagnostics'].split(',')
         self.status_Means = self.ini['STATUS']['Means'].split(',')
-        self.Calibration = self.ini['CO2app']['Calibrate'].split(',')
-        self.Coefficients = self.ini['CO2app']['Coef'].split(',')
+        # self.Calibration = self.ini['CO2APP']['Calibrate'].split(',')
+        # self.Coefficients = self.ini['CO2APP']['Coef'].split(',')
         self.dpath = self.ini['highfreq']['path']
         self.Metadata = configparser.ConfigParser()
         self.Headerdata = configparser.ConfigParser()
@@ -28,6 +28,7 @@ class read_GHG():
         self.meta_dir = self.dpath+self.Site+'\\metadata\\'+self.Year+'\\'
         if not os.path.exists(self.meta_dir):
             os.mkdir(self.meta_dir)
+        self.read_co2app = read_LI_Config(ini_file,format='co2app')
 
     def find_ghg (self):
         # Find every .ghg file in the raw data folder
@@ -137,7 +138,8 @@ class read_GHG():
                         self.dataRecords.loc[self.TimeStamp,self.status_Means] = Status[self.status_Means].mean()
                     elif name.split('.')[-1] == 'conf':
                         # co2app = Read_co2Cal(zip_ref.open(name).read().decode("utf-8"))
-                        self.co2app = read_LI_Config(zip_ref.open(name).read().decode("utf-8"))
+                        # self.co2app = read_LI_Config(zip_ref.open(name).read().decode("utf-8"))
+                        self.read_co2app.parse(zip_ref.open(name).read().decode("utf-8"))
                         # self.co2app_Tags = co2app.Summary.columns
                 self.Parse_Headerdata()
             else:
@@ -180,50 +182,93 @@ class read_GHG():
 class read_LI_Config():
     # Parse the system_config\co2app.conf file from the 7200 to get calibration settings
     # Only an option for co2/h2o the ch4 calibration values are only saved on the LI-7000
-    def __init__(self,co2app_file):
-        self.Coef = re.search(r'Coef(.*?)\)\)\)', co2app_file).group(0)
-        Coef_Keys =  ['CO2 ','H2O ','Pressure ','MaxRef']
-        Coef_Summary = pd.concat(
-            [self.Parse_Coef(Val) for Val in Coef_Keys],
-            axis=0,
-            ignore_index=True)
+    def __init__(self,ini_file,format='L7X'):
+        ini = configparser.ConfigParser()
+        ini.read_file(open(ini_file))
+        if format == 'L7X':
+            self.ini=ini['L7X']
+        else:   
+            self.ini=ini['CO2APP']
 
-        self.Calibrate = re.search(r'Calibrate(.*?)\)\)\)', co2app_file).group(0)
-        Calibrate_Keys =  ['ZeroCO2','SpanCO2','ZeroH2O','SpanH2O'] # Span2CO2 & Span2H2O not needed
-        Calibrate_Summary = pd.concat(
-            [self.Parse_Cal(Val) for Val in Calibrate_Keys],
-            axis=0,
-            ignore_index=True)
 
-        self.Summary = pd.concat(
-            [Calibrate_Summary,Coef_Summary],
-            axis=0)
-    
-    def Parse_Coef(self,key):
-        # Get Calibration coefficients from co2app file
-        Coef_Info = re.search(r''+key+'\((.*?)\)\)', self.Coef).group(1).replace(')(',' ')
-        Coef_Info = pd.DataFrame(np.array([v for v in Coef_Info.split(' ')]).reshape(-1,2))
-        Coef_Info = Coef_Info.rename(columns={0:'Attribute',1:'Value'})
-        Coef_Info['Attribute']=key.replace(' ','')+'_'+Coef_Info['Attribute'].astype(str)
-        return(Coef_Info)
+    def parse(self,co2app_file):
         
-    def Parse_Cal(self,key):
-        # Get Calibration metadata from co2app file
-        Cal_Info = re.search(r''+key+'(.*?)\)\)', self.Calibrate).group(1)
-        Cal_Date = Cal_Info.split('(Date ')[-1].replace(' at ',' ')
-        Cal_Stats = Cal_Info.split('(Date ')[0]
-        Cal_Stats = re.search(r'\((.*)\)', Cal_Stats).group(1).replace(')(',' ')
-        Cal_Stats = pd.DataFrame(np.array([v for v in Cal_Stats.split(' ')]).reshape(-1,2))
-        Cal_Stats = Cal_Stats.rename(columns={0:'Attribute',1:'Value'})
-        Cal_Stats['Attribute']=key+'_'+Cal_Stats['Attribute'].astype(str)
-        try:
-            timestamp = datetime.strptime(Cal_Date,'%b %d %Y %H:%M:%S')
-        except:
-            timestamp = pd.Timestamp('nat')
-            pass
-        Cal_Stats = pd.concat(
-            [Cal_Stats,pd.DataFrame(data={'Attribute':[key+'_Timestamp'],'Value':[timestamp]},index=[0])],
-            axis=0,
-            ignore_index=True
-        )
-        return(Cal_Stats)
+        Calibration = co2app_file.split('Calibrate')[-1].split('Coef')[0]
+        Coefs = co2app_file.split('Coef')[-1].split('Clock')[0][:-1]
+        Sonic = co2app_file.split('Inputs')[-1].split('Calibrate')[0]
+
+        self.makeConfig(Sonic)
+        print(self.config.keys())
+        # for key in self.config.keys():
+        #     print(key)
+
+
+
+
+    def makeConfig(self,string,pnt=False):
+        all = re.findall(r'\((.+?)\)',string)
+        formatted =''
+        for i,v in enumerate(all):
+            
+            if '(' in v:
+                tags = v.split('(')[:-1]
+                for t in tags:
+                    formatted += '\n['+t.replace(' ','')+']\n'
+                formatted += v.split('(')[-1].replace(' ','=',1)
+            else:
+                if ' ' not in v:
+                    formatted += '\n'+v+'='
+                else:
+                    formatted += '\n'+v.replace(' ','=',1)
+        if pnt == True:
+            print(formatted)
+        self.config = configparser.ConfigParser()
+        self.config.read_string(formatted)
+
+    # def __init__(self,co2app_file):
+    #     self.Coef = re.search(r'Coef(.*?)\)\)\)', co2app_file).group(0)
+    #     Coef_Keys =  ['CO2 ','H2O ','Pressure ','MaxRef']
+    #     Coef_Summary = pd.concat(
+    #         [self.Parse_Coef(Val) for Val in Coef_Keys],
+    #         axis=0,
+    #         ignore_index=True)
+
+    #     self.Calibrate = re.search(r'Calibrate(.*?)\)\)\)', co2app_file).group(0)
+    #     Calibrate_Keys =  ['ZeroCO2','SpanCO2','ZeroH2O','SpanH2O'] # Span2CO2 & Span2H2O not needed
+    #     Calibrate_Summary = pd.concat(
+    #         [self.Parse_Cal(Val) for Val in Calibrate_Keys],
+    #         axis=0,
+    #         ignore_index=True)
+
+    #     self.Summary = pd.concat(
+    #         [Calibrate_Summary,Coef_Summary],
+    #         axis=0)
+    
+    # def Parse_Coef(self,key):
+    #     # Get Calibration coefficients from co2app file
+    #     Coef_Info = re.search(r''+key+'\((.*?)\)\)', self.Coef).group(1).replace(')(',' ')
+    #     Coef_Info = pd.DataFrame(np.array([v for v in Coef_Info.split(' ')]).reshape(-1,2))
+    #     Coef_Info = Coef_Info.rename(columns={0:'Attribute',1:'Value'})
+    #     Coef_Info['Attribute']=key.replace(' ','')+'_'+Coef_Info['Attribute'].astype(str)
+    #     return(Coef_Info)
+        
+    # def Parse_Cal(self,key):
+    #     # Get Calibration metadata from co2app file
+    #     Cal_Info = re.search(r''+key+'(.*?)\)\)', self.Calibrate).group(1)
+    #     Cal_Date = Cal_Info.split('(Date ')[-1].replace(' at ',' ')
+    #     Cal_Stats = Cal_Info.split('(Date ')[0]
+    #     Cal_Stats = re.search(r'\((.*)\)', Cal_Stats).group(1).replace(')(',' ')
+    #     Cal_Stats = pd.DataFrame(np.array([v for v in Cal_Stats.split(' ')]).reshape(-1,2))
+    #     Cal_Stats = Cal_Stats.rename(columns={0:'Attribute',1:'Value'})
+    #     Cal_Stats['Attribute']=key+'_'+Cal_Stats['Attribute'].astype(str)
+    #     try:
+    #         timestamp = datetime.strptime(Cal_Date,'%b %d %Y %H:%M:%S')
+    #     except:
+    #         timestamp = pd.Timestamp('nat')
+    #         pass
+    #     Cal_Stats = pd.concat(
+    #         [Cal_Stats,pd.DataFrame(data={'Attribute':[key+'_Timestamp'],'Value':[timestamp]},index=[0])],
+    #         axis=0,
+    #         ignore_index=True
+    #     )
+    #     return(Cal_Stats)
